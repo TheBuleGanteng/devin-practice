@@ -72,6 +72,7 @@ if prompt := st.chat_input("What would you like to ask?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
+        api_success = True
         
         try:
             # Create a chat completion
@@ -95,12 +96,14 @@ if prompt := st.chat_input("What would you like to ask?"):
             message_placeholder.markdown(full_response)
             
         except Exception as e:
+            api_success = False
             st.error(f"Error calling OpenAI API: {str(e)}")
             full_response = "Sorry, I encountered an error while processing your request."
             message_placeholder.markdown(full_response)
     
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Only add successful responses to chat history to avoid polluting context
+    if api_success:
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 # Footer
 st.markdown("---")
