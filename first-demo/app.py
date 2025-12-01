@@ -57,7 +57,14 @@ if "messages" not in st.session_state:
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        # Check if this is an error message and display appropriately
+        if message.get("is_error", False):
+            st.error(message["content"])
+            if "error_details" in message:
+                with st.expander("Error Details"):
+                    st.code(message["error_details"])
+        else:
+            st.markdown(message["content"])
 
 # Accept user input
 if prompt := st.chat_input("What would you like to ask?"):
@@ -72,16 +79,19 @@ if prompt := st.chat_input("What would you like to ask?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        api_success = True
+        is_error = False
+        error_details = None
         
         try:
-            # Create a chat completion
+            # Create a chat completion - exclude error messages from context
+            valid_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+                if not m.get("is_error", False)
+            ]
             stream = client.chat.completions.create(
                 model=model,
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
-                ],
+                messages=valid_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stream=True,
@@ -96,14 +106,19 @@ if prompt := st.chat_input("What would you like to ask?"):
             message_placeholder.markdown(full_response)
             
         except Exception as e:
-            api_success = False
-            st.error(f"Error calling OpenAI API: {str(e)}")
+            is_error = True
+            error_details = str(e)
+            st.error(f"Error calling OpenAI API: {error_details}")
             full_response = "Sorry, I encountered an error while processing your request."
             message_placeholder.markdown(full_response)
     
-    # Only add successful responses to chat history to avoid polluting context
-    if api_success:
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Add assistant response to chat history with error flag if applicable
+    message_entry = {"role": "assistant", "content": full_response}
+    if is_error:
+        message_entry["is_error"] = True
+        if error_details:
+            message_entry["error_details"] = error_details
+    st.session_state.messages.append(message_entry)
 
 # Footer
 st.markdown("---")
