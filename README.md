@@ -49,7 +49,7 @@ A simple Streamlit application that integrates with OpenAI's API to provide an i
    cd devin-practice
 
    # Build and start the container
-   docker-compose up -d --build
+   docker compose up -d --build
 
    # Or if you have a main docker-compose.yml, add this service to it
    ```
