@@ -83,11 +83,13 @@ if prompt := st.chat_input("What would you like to ask?"):
         
         try:
             # Create a chat completion
+            # Filter out error messages to avoid sending non-conversational error text to the API
             stream = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": m["role"], "content": m["content"]}
                     for m in st.session_state.messages
+                    if not m.get("is_error", False)
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
