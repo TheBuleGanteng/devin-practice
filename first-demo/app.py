@@ -79,18 +79,19 @@ if prompt := st.chat_input("What would you like to ask?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        api_error_occurred = False
+        is_error = False
+        error_details = None
         
         try:
-            # Create a chat completion
-            # Filter out error messages to avoid sending non-conversational error text to the API
+            # Create a chat completion - exclude error messages from context
+            valid_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+                if not m.get("is_error", False)
+            ]
             stream = client.chat.completions.create(
                 model=model,
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
-                    if not m.get("is_error", False)
-                ],
+                messages=valid_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stream=True,
@@ -105,22 +106,19 @@ if prompt := st.chat_input("What would you like to ask?"):
             message_placeholder.markdown(full_response)
             
         except Exception as e:
-            api_error_occurred = True
+            is_error = True
             error_details = str(e)
             st.error(f"Error calling OpenAI API: {error_details}")
             full_response = "Sorry, I encountered an error while processing your request."
             message_placeholder.markdown(full_response)
-            # Store error flag and details to distinguish from successful responses
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": full_response,
-                "is_error": True,
-                "error_details": error_details
-            })
     
-    # Only add successful response to chat history (errors handled in except block)
-    if not api_error_occurred:
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Add assistant response to chat history with error flag if applicable
+    message_entry = {"role": "assistant", "content": full_response}
+    if is_error:
+        message_entry["is_error"] = True
+        if error_details:
+            message_entry["error_details"] = error_details
+    st.session_state.messages.append(message_entry)
 
 # Footer
 st.markdown("---")
