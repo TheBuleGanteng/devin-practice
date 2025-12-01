@@ -57,7 +57,14 @@ if "messages" not in st.session_state:
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        # Check if this is an error message and display appropriately
+        if message.get("is_error", False):
+            st.error(message["content"])
+            if "error_details" in message:
+                with st.expander("Error Details"):
+                    st.code(message["error_details"])
+        else:
+            st.markdown(message["content"])
 
 # Accept user input
 if prompt := st.chat_input("What would you like to ask?"):
@@ -72,14 +79,17 @@ if prompt := st.chat_input("What would you like to ask?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
+        api_error_occurred = False
         
         try:
             # Create a chat completion
+            # Filter out error messages to avoid sending non-conversational error text to the API
             stream = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": m["role"], "content": m["content"]}
                     for m in st.session_state.messages
+                    if not m.get("is_error", False)
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -95,12 +105,22 @@ if prompt := st.chat_input("What would you like to ask?"):
             message_placeholder.markdown(full_response)
             
         except Exception as e:
-            st.error(f"Error calling OpenAI API: {str(e)}")
+            api_error_occurred = True
+            error_details = str(e)
+            st.error(f"Error calling OpenAI API: {error_details}")
             full_response = "Sorry, I encountered an error while processing your request."
             message_placeholder.markdown(full_response)
+            # Store error flag and details to distinguish from successful responses
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": full_response,
+                "is_error": True,
+                "error_details": error_details
+            })
     
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Only add successful response to chat history (errors handled in except block)
+    if not api_error_occurred:
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 # Footer
 st.markdown("---")
