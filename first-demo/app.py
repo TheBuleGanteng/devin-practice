@@ -58,6 +58,8 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        if message.get("is_error"):
+            st.caption("⚠️ This response was generated due to an error")
 
 # Accept user input
 if prompt := st.chat_input("What would you like to ask?"):
@@ -72,15 +74,18 @@ if prompt := st.chat_input("What would you like to ask?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
+        is_error = False
         
         try:
-            # Create a chat completion
+            # Create a chat completion - exclude error messages from context
+            valid_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+                if not m.get("is_error")
+            ]
             stream = client.chat.completions.create(
                 model=model,
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
-                ],
+                messages=valid_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 stream=True,
@@ -95,12 +100,16 @@ if prompt := st.chat_input("What would you like to ask?"):
             message_placeholder.markdown(full_response)
             
         except Exception as e:
+            is_error = True
             st.error(f"Error calling OpenAI API: {str(e)}")
             full_response = "Sorry, I encountered an error while processing your request."
             message_placeholder.markdown(full_response)
     
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Add assistant response to chat history with error flag if applicable
+    message_entry = {"role": "assistant", "content": full_response}
+    if is_error:
+        message_entry["is_error"] = True
+    st.session_state.messages.append(message_entry)
 
 # Footer
 st.markdown("---")
