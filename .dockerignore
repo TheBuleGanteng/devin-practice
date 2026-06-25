@@ -45,3 +45,14 @@ Thumbs.db
 streamlit-demo.service
 nginx-demo.conf
 docker-compose.yml
+
+# Environments
+.env
+.env.local
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
